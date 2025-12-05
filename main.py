@@ -1,9 +1,10 @@
 from datetime import datetime
 from thingspeak_handler import read_from_thingspeak
-from mongo_handler import salvar_parada, salvar_regra
+from mongo_handler import salvar_em_colecao, salvar_regra
 
 def parse_feed(feed, parada_nome, canal_id):
-    """Converte feed do ThingSpeak em documento organizado"""
+    """Transforma feed do ThingSpeak em documento limpo e legível."""
+    
     if not feed:
         return None
 
@@ -14,44 +15,55 @@ def parse_feed(feed, parada_nome, canal_id):
 
     return {
         "timestamp": timestamp,
-        "botao": feed.get("field1", "desconhecido"),
-        "estado": feed.get("field2", "desconhecido"),
         "parada": parada_nome,
-        "canal_thingspeak": canal_id
+        "canal": canal_id,
+
+        "visual": int(feed.get("field1", 0)),
+        "fisico": int(feed.get("field3", 0)),
     }
 
 def main():
     print("📡 Iniciando sincronização ThingSpeak → MongoDB...")
 
-    # --- Regras ---
-    print("🔹 Buscando regras...")
-    feeds_regras = read_from_thingspeak("regras", results=8000)  # pegar todos registros
-    print(f"🔹 {len(feeds_regras)} registros encontrados em regras.")
+    # ---------------- REGRAS ----------------
+    print("🔹 Baixando regras...")
+    feeds_regras = read_from_thingspeak("regras", results=8000)
+    print(f"🔹 {len(feeds_regras)} registros encontrados.")
+
     for feed in feeds_regras:
-        regra_doc = parse_feed(feed, "regras", 3096396)
-        if regra_doc:
+        try:
+            regra_doc = {
+                "timestamp": feed.get("created_at"),
+                "f1": feed.get("field1"),
+                "f2": feed.get("field2"),
+                "f3": feed.get("field3")
+            }
             salvar_regra(regra_doc)
+        except Exception as e:
+            print("Erro salvando regra:", e)
 
-    # --- Parada 1 ---
-    print("🔹 Buscando parada_1...")
+    # ---------------- PARADA 1 ----------------
+    print("🔹 Baixando dados da Parada P001...")
     feeds_p1 = read_from_thingspeak("parada1", results=8000)
-    print(f"🔹 {len(feeds_p1)} registros encontrados em parada_1.")
+    print(f"🔹 {len(feeds_p1)} registros encontrados.")
+
     for feed in feeds_p1:
-        parada1_doc = parse_feed(feed, "parada_1", 3096316)
-        if parada1_doc:
-            salvar_parada(parada1_doc)
+        doc = parse_feed(feed, "P001", 3096316)
+        if doc:
+            salvar_em_colecao("parada_P001_logs", doc)
 
-    # --- Parada 2 ---
-    print("🔹 Buscando parada_2...")
+    # ---------------- PARADA 2 ----------------
+    print("🔹 Baixando dados da Parada P002...")
     feeds_p2 = read_from_thingspeak("parada2", results=8000)
-    print(f"🔹 {len(feeds_p2)} registros encontrados em parada_2.")
-    for feed in feeds_p2:
-        parada2_doc = parse_feed(feed, "parada_2", 3102167)
-        if parada2_doc:
-            salvar_parada(parada2_doc)
+    print(f"🔹 {len(feeds_p2)} registros encontrados.")
 
-    print("✅ Sincronização completa.")
-    print("📌 Todos os dados do ThingSpeak foram salvos no MongoDB.")
+    for feed in feeds_p2:
+        doc = parse_feed(feed, "P002", 3102167)
+        if doc:
+            salvar_em_colecao("parada_P002_logs", doc)
+
+    print("✅ Sincronização finalizada!")
+    print("📌 Dados organizados em coleções separadas por parada.")
 
 if __name__ == "__main__":
     try:

@@ -16,7 +16,7 @@ CHANNELS = {
 }
 
 def read_from_thingspeak(tipo, results=8000):
-    """Lê múltiplos registros de um canal ThingSpeak"""
+    """Lê múltiplos feeds de um canal ThingSpeak"""
     channel = CHANNELS[tipo]
     url = f"https://api.thingspeak.com/channels/{channel['id']}/feeds.json"
     params = {
